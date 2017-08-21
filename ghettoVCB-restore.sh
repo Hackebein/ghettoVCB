@@ -168,6 +168,9 @@ ghettoVCBrestore() {
         if [ -d "${VM_TO_RESTORE}" ]; then
             #figure out the contents of the directory (*.vmdk,*-flat.vmdk,*.vmx)
             VM_ORIG_VMX=$(ls "${VM_TO_RESTORE}" | grep ".vmx")
+            VM_ORIG_NVRAM=$(ls "${VM_TO_RESTORE}" | grep ".nvram")
+            VM_ORIG_VMSS=$(ls "${VM_TO_RESTORE}" | grep ".vmss")
+            VM_ORIG_VMEM=$(ls "${VM_TO_RESTORE}" | grep ".vmem")
             VM_VMDK_DESCRS=$(ls "${VM_TO_RESTORE}" | grep ".vmdk" | grep -v "\-flat.vmdk")
             VMDKS_FOUND=$(grep -iE '(scsi|ide|sata)' "${VM_TO_RESTORE}/${VM_ORIG_VMX}" | grep -i fileName | awk -F " " '{print $1}')
             VM_FOLDER_NAME=$(echo "${VM_TO_RESTORE##*/}")
@@ -179,10 +182,16 @@ ghettoVCBrestore() {
                 VM_VMX_NAME=${VM_ORIG_VMX}
 		VM_RESTORE_FOLDER_NAME=${VM_ORIG_FOLDER_NAME}
 		VM_RESTORE_VMX=${VM_ORIG_VMX}
+		VM_RESTORE_NVRAM=${VM_ORIG_NVRAM}
+		VM_RESTORE_VMSS=${VM_ORIG_VMSS}
+		VM_RESTORE_VMEM=${VM_ORIG_VMEM}
             else
                 VM_DISPLAY_NAME=${RESTORE_VM_NAME}
                 VM_RESTORE_FOLDER_NAME=${RESTORE_VM_NAME}
                 VM_RESTORE_VMX=${RESTORE_VM_NAME}.vmx
+                VM_RESTORE_NVRAM=${RESTORE_VM_NAME}.nvram
+                VM_RESTORE_VMSS=${RESTORE_VM_NAME}.vmss
+                VM_RESTORE_VMEM=${RESTORE_VM_NAME}.vmem
             fi
 
             #figure out the VMDK rename, esepcially important if original backup had VMDKs spread across multiple datastores
@@ -287,6 +296,20 @@ if [ ! "${IS_TGZ}" == "1" ]; then
             if [ ! "${DEVEL_MODE}" == "2" ]; then
                 cp "${VM_TO_RESTORE}/${VM_ORIG_VMX}" "${VM_RESTORE_DIR}/${VM_RESTORE_VMX}"
                 sed -i "s/displayName =.*/displayName = ${VM_DISPLAY_NAME}/g" "${VM_RESTORE_DIR}/${VM_RESTORE_VMX}"
+                if [ -e "${VM_TO_RESTORE}/bios440.rom" ]; then
+                    cp "${VM_TO_RESTORE}/bios440.rom" "${VM_RESTORE_DIR}";
+                fi
+                if [ -e "${VM_TO_RESTORE}/${VM_ORIG_NVRAM}" ]; then
+                    cp "${VM_TO_RESTORE}/${VM_ORIG_NVRAM}" "${VM_RESTORE_DIR}/${VM_RESTORE_NVRAM}"
+                    sed -i "s/nvram =.*/nvram = ${VM_RESTORE_NVRAM}/g" "${VM_RESTORE_DIR}/${VM_RESTORE_VMX}"
+                fi
+                if [ -e "${VM_TO_RESTORE}/${VM_ORIG_VMSS}" ]; then
+                    cp "${VM_TO_RESTORE}/${VM_ORIG_VMSS}" "${VM_RESTORE_DIR}/${VM_RESTORE_VMSS}"
+                    sed -i "s/checkpoint.vmState =.*/checkpoint.vmState = ${VM_RESTORE_VMSS}/g" "${VM_RESTORE_DIR}/${VM_RESTORE_VMX}"
+                fi
+                if [ -e "${VM_TO_RESTORE}/${VM_ORIG_VMEM}" ]; then
+                    cp "${VM_TO_RESTORE}/${VM_ORIG_VMEM}" "${VM_RESTORE_DIR}/${VM_RESTORE_VMEM}";
+                fi
             fi
 
             #loop through all VMDK(s) and vmkfstools copy to destination

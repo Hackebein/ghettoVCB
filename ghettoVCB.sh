@@ -857,6 +857,8 @@ ghettoVCB() {
         VMX_CONF=$(grep -E "\"${VM_NAME}\"" ${WORKDIR}/vms_list | awk -F ";" '{print $4}' | sed 's/\[//;s/\]//;s/"//g')
         VMX_PATH="/vmfs/volumes/${VMFS_VOLUME}/${VMX_CONF}"
         VMX_DIR=$(dirname "${VMX_PATH}")
+        VMX_NVRAM_PATH="${VMX_DIR}/$(grep -E "^nvram" "${VMX_PATH}" | awk -F \" '{print $2}')"
+        VMX_BIOS440_PATH="${VMX_DIR}/$(grep -E "^bios440.fileName" "${VMX_PATH}" | awk -F \" '{print $2}')"
 
         #storage info
         if [[ ! -z ${VM_ID} ]] && [[ "${LOG_LEVEL}" != "dryrun" ]]; then
@@ -978,6 +980,12 @@ ghettoVCB() {
             mkdir -p "${VM_BACKUP_DIR}"
 
             cp "${VMX_PATH}" "${VM_BACKUP_DIR}"
+            if [ -e "${VMX_NVRAM_PATH}" ]; then
+                cp "${VMX_NVRAM_PATH}" "${VM_BACKUP_DIR}";
+            fi
+            if [ -e "${VMX_BIOS440_PATH}" ]; then
+                cp "${VMX_BIOS440_PATH}" "${VM_BACKUP_DIR}";
+            fi
 
             #new variable to keep track on whether VM has independent disks
             VM_HAS_INDEPENDENT_DISKS=0
@@ -1033,6 +1041,13 @@ ghettoVCB() {
                 fi
 
                 if [[ ${SNAP_SUCCESS} -eq 1 ]] ; then
+                    if [[ "${NEW_VIMCMD_SNAPSHOT}" == "yes" ]] ; then
+                        SNAPSHOT_ID=$(${VMWARE_CMD} vmsvc/snapshot.get ${VM_ID} | grep -E '(Snapshot Name|Snapshot Id)' | grep -A1 ${SNAPSHOT_NAME} | grep "Snapshot Id" | awk -F ":" '{print $2}' | sed -e 's/^[[:blank:]]*//;s/[[:blank:]]*$//')
+                        cp "${VMX_DIR}/${VM_NAME}-Snapshot${SNAPSHOT_ID}.vmem" "${VM_BACKUP_DIR}/${VM_NAME}.vmem"
+                        cp "${VMX_DIR}/${VM_NAME}-Snapshot${SNAPSHOT_ID}.vmsn" "${VM_BACKUP_DIR}/${VM_NAME}.vmss"
+                        sed '/^checkpoint.vmState/d' -i "${VM_BACKUP_DIR}/${VM_NAME}.vmx"
+                        echo checkpoint.vmState = \"${VM_NAME}.vmss\" >> "${VM_BACKUP_DIR}/${VM_NAME}.vmx"
+                    fi
                     OLD_IFS="${IFS}"
                     IFS=":"
                     for j in ${VMDKS}; do
